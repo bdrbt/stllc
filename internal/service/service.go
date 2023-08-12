@@ -43,16 +43,18 @@ func New(cfg *config.Config) (*Service, error) {
 		state:      Starting,
 		router:     chi.NewRouter(),
 		repository: repo,
-		httoServer: &http.Server{
-			Addr:              ":1234",
-			ReadHeaderTimeout: defaultTimeout * time.Second,
-		},
 	}
 
 	// setup soutes
 	svc.router.Get("/state", svc.State)
-	svc.router.Get("/upate", svc.Update)
+	svc.router.Get("/update", svc.Update)
 	svc.router.Get("/get_names", svc.GetNames)
+
+	svc.httoServer = &http.Server{
+		Addr:              cfg.Addr,
+		ReadHeaderTimeout: defaultTimeout * time.Second,
+		Handler:           svc.router,
+	}
 
 	return svc, nil
 }

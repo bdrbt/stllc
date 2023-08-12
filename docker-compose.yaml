@@ -4,6 +4,18 @@ services:
   stllc:
     container_name: feeder
     build: .
+    environment:
+      PG_HOST: postgres
+      PG_PORT: 5432
+      PG_USER: postgres
+      PG_PASS: postgres
+      PG_DATABASE: postgres
+      ADDR: ":8080"
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
 
   postgres:
     container_name: postgres

@@ -57,8 +57,11 @@ func (repo *Repository) Upsert(ctx context.Context, sc domain.SDNRecord) error {
 		sc.FirstName,
 		sc.LastName,
 	)
+	if err != nil {
+		return fmt.Errorf("error upserting record:%w", err)
+	}
 
-	return fmt.Errorf("error upserting record:%w", err)
+	return nil
 }
 
 func (repo *Repository) QueryByName(ctx context.Context, name string) ([]domain.SDNRecord, error) {
