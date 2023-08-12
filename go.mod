@@ -5,7 +5,6 @@ go 1.20
 require (
 	github.com/go-chi/chi v1.5.4
 	github.com/golang-migrate/migrate/v4 v4.16.2
-	github.com/google/uuid v1.3.0
 	github.com/jackc/pgx/v5 v5.4.3
 )
 

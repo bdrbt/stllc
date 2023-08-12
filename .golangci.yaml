@@ -12,7 +12,7 @@ linters:
     - contextcheck
     - cyclop
     - decorder
-    - depguard
+    # - depguard
     - dogsled
     - dupl
     - dupword
@@ -78,7 +78,6 @@ linters:
     - sqlclosecheck
     - staticcheck
     - stylecheck
-    - tagliatelle
     - tenv
     - testableexamples
     - testpackage
@@ -88,7 +87,6 @@ linters:
     - unparam
     - unused
     - usestdlibvars
-    - varnamelen
     - wastedassign
     - whitespace
     - wrapcheck

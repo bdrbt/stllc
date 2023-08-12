@@ -6,12 +6,12 @@ import (
 	"log"
 	"net/http"
 	"sync"
-
-	"github.com/go-chi/chi"
+	"time"
 
 	"github.com/bdrbt/stllc/internal/config"
 	"github.com/bdrbt/stllc/internal/repository"
 	"github.com/bdrbt/stllc/pkg/dto"
+	"github.com/go-chi/chi"
 )
 
 const (
@@ -20,15 +20,18 @@ const (
 	Busy
 )
 
+const defaultTimeout = 3
+
 type Service struct {
 	state      int                    // Current service state, on of Starting, Ready, Busy
 	lock       sync.RWMutex           // mutex to handle state flag switching
 	router     *chi.Mux               // router
 	feedURL    string                 // feed URL
 	repository *repository.Repository // storage
+	httoServer *http.Server
 }
 
-// New - creating new Service instance
+// New - creating new Service instance.
 func New(cfg *config.Config) (*Service, error) {
 	repo, err := repository.New(cfg.PgURL())
 	if err != nil {
@@ -40,11 +43,15 @@ func New(cfg *config.Config) (*Service, error) {
 		state:      Starting,
 		router:     chi.NewRouter(),
 		repository: repo,
+		httoServer: &http.Server{
+			Addr:              ":1234",
+			ReadHeaderTimeout: defaultTimeout * time.Second,
+		},
 	}
 
 	// setup soutes
 	svc.router.Get("/state", svc.State)
-	svc.router.Get("/update", svc.Update)
+	svc.router.Get("/upate", svc.Update)
 	svc.router.Get("/get_names", svc.GetNames)
 
 	return svc, nil
@@ -57,24 +64,35 @@ func (svc *Service) Run() error {
 	svc.state = Ready
 	svc.lock.Unlock()
 
-	go http.ListenAndServe(":8080", svc.router)
+	go func() {
+		err := svc.httoServer.ListenAndServe()
+		if err != nil {
+			panic(err)
+		}
+	}()
+
 	return nil
 }
 
-// JSONResponse - serialize provided data into JSON and write them into ResponseWriter
+// JSONResponse - serialize provided data into JSON and write them into ResponseWriter.
 func (svc *Service) JSONResponse(w http.ResponseWriter, data interface{}) {
 	w.Header().Set("Content-Type", "application/json")
+
 	json, err := json.Marshal(data)
 	if err != nil {
 		log.Printf("error writing response:%v", err)
 	}
-	w.Write(json)
+
+	_, err = w.Write(json)
+	if err != nil {
+		log.Printf("cannot write response:%v", err)
+	}
 }
 
 func (svc *Service) UpdateSuccessResponse(w http.ResponseWriter) {
 	svc.JSONResponse(w, dto.UpdateResponse{
 		Result: true,
-		Code:   200,
+		Code:   http.StatusOK,
 		Info:   "",
 	})
 }
@@ -82,8 +100,7 @@ func (svc *Service) UpdateSuccessResponse(w http.ResponseWriter) {
 func (svc *Service) UpdateFailResponse(w http.ResponseWriter) {
 	svc.JSONResponse(w, dto.UpdateResponse{
 		Result: false,
-		Code:   503,
+		Code:   http.StatusServiceUnavailable,
 		Info:   "service unavailable",
 	})
-	return
 }

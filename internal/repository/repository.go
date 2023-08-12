@@ -2,12 +2,12 @@ package repository
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"strings"
 
-	"github.com/jackc/pgx/v5/pgxpool"
-
 	"github.com/bdrbt/stllc/internal/domain"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 const (
@@ -34,10 +34,10 @@ type Repository struct {
 	db *pgxpool.Pool
 }
 
-func New(DBURL string) (*Repository, error) {
+func New(dbURL string) (*Repository, error) {
 	repo := &Repository{}
 
-	poolConfig, err := pgxpool.ParseConfig(DBURL)
+	poolConfig, err := pgxpool.ParseConfig(dbURL)
 	if err != nil {
 		log.Fatalln("Unable to parse DATABASE_URL:", err)
 	}
@@ -50,25 +50,28 @@ func New(DBURL string) (*Repository, error) {
 	return repo, nil
 }
 
-// Upsert - insert retrieved records or update existing
-func (repo *Repository) Upsert(sc domain.SDNRecord, updID string) error {
-	_, err := repo.db.Exec(context.Background(), upsertSQL,
+// Upsert - insert retrieved records or update existing.
+func (repo *Repository) Upsert(ctx context.Context, sc domain.SDNRecord) error {
+	_, err := repo.db.Exec(ctx, upsertSQL,
 		sc.UID,
 		sc.FirstName,
 		sc.LastName,
 	)
 
-	return err
+	return fmt.Errorf("error upserting record:%w", err)
 }
 
-func (repo *Repository) QueryByName(name string) ([]domain.SDNRecord, error) {
-	rows, err := repo.db.Query(context.Background(), queryStrictSQL, strings.ToLower(name))
+func (repo *Repository) QueryByName(ctx context.Context, name string) ([]domain.SDNRecord, error) {
+	rows, err := repo.db.Query(ctx, queryStrictSQL, strings.ToLower(name))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error querying records:%w", err)
 	}
+
 	recs := make([]domain.SDNRecord, 0)
+
 	for rows.Next() {
 		rec := domain.SDNRecord{}
+
 		err := rows.Scan(
 			&rec.UID,
 			&rec.FirstName,
@@ -77,28 +80,33 @@ func (repo *Repository) QueryByName(name string) ([]domain.SDNRecord, error) {
 			&rec.UpdatedAt,
 		)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("error mapping values:%w", err)
 		}
+
 		recs = append(recs, rec)
 	}
+
 	return recs, nil
 }
 
-func (repo *Repository) QueryByPattern(query string) ([]domain.SDNRecord, error) {
-	// create %pattern% wildcards array
+func (repo *Repository) QueryByPattern(ctx context.Context, query string) ([]domain.SDNRecord, error) {
 	wildcards := make([]string, 0)
 
+	// fill %pattern% wildcards array
 	for _, v := range strings.Split(query, " ") {
 		wildcards = append(wildcards, "%"+v+"%")
 	}
 
-	rows, err := repo.db.Query(context.Background(), queryWeakSQL, wildcards)
+	rows, err := repo.db.Query(ctx, queryWeakSQL, wildcards)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error querying records:%w", err)
 	}
+
 	recs := make([]domain.SDNRecord, 0)
+
 	for rows.Next() {
 		rec := domain.SDNRecord{}
+
 		err := rows.Scan(
 			&rec.UID,
 			&rec.FirstName,
@@ -107,9 +115,11 @@ func (repo *Repository) QueryByPattern(query string) ([]domain.SDNRecord, error)
 			&rec.UpdatedAt,
 		)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("error mapping values:%w", err)
 		}
+
 		recs = append(recs, rec)
 	}
+
 	return recs, nil
 }

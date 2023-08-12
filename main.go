@@ -35,8 +35,6 @@ func main() {
 		log.Fatalf("error starting service:%v", err)
 	}
 
-	svc.Run()
-
 	sig := <-shutdown
 	log.Print("shutdown on:", sig)
 }

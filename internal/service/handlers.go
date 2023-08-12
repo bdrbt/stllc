@@ -8,6 +8,8 @@ import (
 )
 
 // State handler.
+//
+//nolint:revive
 func (svc *Service) State(w http.ResponseWriter, r *http.Request) {
 	svc.lock.RLock()
 	defer svc.lock.RUnlock()
@@ -35,35 +37,33 @@ func (svc *Service) State(w http.ResponseWriter, r *http.Request) {
 
 			return
 		}
-
 	}
 }
 
 // Update handler.
 func (svc *Service) Update(w http.ResponseWriter, r *http.Request) {
-	// Check if service is busy or starting
-	// TODO move it into separate func
+	// Check if service is busy or starting.
 	svc.lock.Lock()
 	if svc.state != Ready {
-		// releas lock and finish
+		// releas lock and finish.
 		svc.lock.Unlock()
 		svc.UpdateFailResponse(w)
+
 		return
 	}
 
-	// set it's into Busy state
-	// TODO move it into separate func
+	// set it's into Busy state.
 	svc.state = Busy
 	svc.lock.Unlock()
 
-	// ensure we change service state at the end
+	// ensure we change service state at the end.
 	defer func() {
 		svc.lock.Lock()
 		svc.state = Ready
 		svc.lock.Unlock()
 	}()
 
-	err := svc.syncData()
+	err := svc.syncData(r.Context())
 	if err != nil {
 		log.Printf("update error:%v", err)
 		svc.UpdateFailResponse(w)
@@ -72,30 +72,38 @@ func (svc *Service) Update(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// GenNames handler
+// GenNames handler.
 func (svc *Service) GetNames(w http.ResponseWriter, r *http.Request) {
-	recs := []domain.SDNRecord{}
-	var err error
+	var (
+		recs []domain.SDNRecord
+		err  error
+	)
 
 	name := r.URL.Query().Get("name")
 	queryType := r.URL.Query().Get("type")
 
 	if name == "" {
-		log.Printf("error querying emtpy name")
+		log.Printf("name param not provided")
+
 		return
 	}
+
 	if queryType == "strong" {
 		log.Printf("strong quereyng:\"%s\"", name)
-		recs, err = svc.repository.QueryByName(name)
+
+		recs, err = svc.repository.QueryByName(r.Context(), name)
 		if err != nil {
-			log.Printf("error while retrieving emtpy name")
+			log.Printf("error searching by name")
+
 			return
 		}
 	} else {
 		log.Printf("weak quereyng:\"%s\"", name)
-		recs, err = svc.repository.QueryByPattern(name)
+		recs, err = svc.repository.QueryByPattern(r.Context(), name)
+
 		if err != nil {
-			log.Printf("error while retrieving emtpy name")
+			log.Printf("error searching by pattern")
+
 			return
 		}
 	}

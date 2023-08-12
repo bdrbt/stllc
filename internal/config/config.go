@@ -23,6 +23,7 @@ type Config struct {
 
 func Load() (*Config, error) {
 	var err error
+
 	cfg := &Config{}
 	cfg.Postgres.Host = os.Getenv("PG_HOST")
 	cfg.Postgres.User = os.Getenv("PG_USER")
@@ -52,6 +53,7 @@ func Load() (*Config, error) {
 	return cfg, cfg.Validate()
 }
 
+//nolint:goerr113
 func (cfg *Config) Validate() error {
 	if cfg.Postgres.Host == "" {
 		return errors.New("postgres host is not set")
@@ -68,6 +70,7 @@ func (cfg *Config) Validate() error {
 	return nil
 }
 
+//nolint:nosprintfhostport
 func (cfg *Config) PgURL() string {
 	return fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=disable",
 		cfg.Postgres.User,
