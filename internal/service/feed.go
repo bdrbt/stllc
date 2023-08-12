@@ -4,10 +4,10 @@ import (
 	"context"
 	"encoding/xml"
 	"fmt"
-	"io"
 	"log"
 	"net/http"
 
+	"github.com/bdrbt/stllc/internal/domain"
 	"github.com/bdrbt/stllc/pkg/dto"
 )
 
@@ -28,32 +28,41 @@ func (svc *Service) syncData(ctx context.Context) error {
 		return fmt.Errorf("error requsting remote url:%w", err)
 	}
 
-	defer rsp.Body.Close()
+	records := make([]domain.SDNRecord, 0)
 
-	// yep, i know it's huge
-	raw, err := io.ReadAll(rsp.Body)
-	if err != nil {
-		return fmt.Errorf("error reading response stream:%w", err)
+	decoder := xml.NewDecoder(rsp.Body)
+	for {
+		t, _ := decoder.Token()
+
+		// break on EOF.
+		if t == nil {
+			break
+		}
+
+		switch se := t.(type) {
+		case xml.StartElement:
+			if se.Name.Local == "sdnEntry" {
+				var rec dto.SdnEntry
+
+				decoder.DecodeElement(&rec, &se)
+				if rec.SdnType == "Individual" {
+					records = append(records, rec.Domain())
+				}
+			}
+		default:
+		}
 	}
 
-	responseData := dto.SdnResponse{}
+	rsp.Body.Close()
 
-	err = xml.Unmarshal(raw, &responseData)
-	if err != nil {
-		return fmt.Errorf("error deserialising remote response:%w", err)
-	}
-
-	for _, rec := range responseData.SdnEntries {
-		err := svc.repository.Upsert(ctx, rec.Domain())
+	for _, rec := range records {
+		err := svc.repository.Upsert(ctx, rec)
 		if err != nil {
 			return fmt.Errorf("cannot upsert record:%w", err)
 		}
-
-		log.Printf("Entity:%s", rec.Pretty())
 	}
 
-	// log update
-	log.Printf("received %d records", len(responseData.SdnEntries))
+	log.Printf("received %d individual records", len(records))
 
 	return nil
 }
